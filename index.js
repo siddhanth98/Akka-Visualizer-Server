@@ -26,18 +26,13 @@ function clusterByColor() {
 
 function removeEdge(from, to) {
     let index = -1;
-    console.log(edgeData);
     for (let id of Object.keys(edgeData)) {
-        console.log(`requested from = ${from} ; to = ${to}`);
-        console.log(`current from = ${edgeData[id].from} ; to = ${edgeData[id].to}`);
-
         if (edgeData[id].from === from && edgeData[id].to === to) {
             index = id;
             break;
         }
     }
     if (index > -1) {
-        console.log(`edge id found for removal - ${index}`);
         delete edgeData[index];
         edges.remove(index);
     }
@@ -87,7 +82,7 @@ let edgeIndex = 0;
 let nodeData = {};
 let edgeData = {};
 
-// initialize your network!
+// initialize the network!
 let network = new vis.Network(container, data, options);
 
 network.on("selectNode", function (params) {
@@ -95,7 +90,6 @@ network.on("selectNode", function (params) {
     else {
         let clickedNodeId = params.nodes[0];
         let clickedNode = nodeData[clickedNodeId];
-
         display(clickedNode);
     }
 });
@@ -147,5 +141,4 @@ socket.on("constructNode", (name) => {
     let nodeId = state.name;
     let node = nodeData[nodeId];
     Object.keys(state).forEach(s => node.state[s] = state[s]);
-    console.log(node);
 }).on("disconnect", () => socket.disconnect());
