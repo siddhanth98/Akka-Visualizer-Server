@@ -1,6 +1,15 @@
 const Node = require("./VisNode");
-const nodes = {}, nodeNameToId = {};
-let id = 0;
+let nodes = {}, nodeNameToId = {};
+let nodeId = 0;
+
+/**
+ * Reset node index
+ */
+function resetNodeIndex() {
+    nodeId = 0;
+    nodes = {};
+    nodeNameToId = {};
+}
 
 /**
  * Updates the state of the node
@@ -42,12 +51,12 @@ function deleteNode(name) {
  * @return New node reference
  */
 function createNode(label, neighbors = [], state = {}) {
-    let newNode = new Node(id, label, neighbors, state);
-    nodes[id] = newNode;
-    nodeNameToId[label] = id;
-    id += 1;
+    let newNode = new Node(nodeId, label, neighbors, state);
+    nodes[nodeId] = newNode;
+    nodeNameToId[label] = nodeId;
+    nodeId += 1;
     console.log(`created node labelled ${label}\n`);
     return newNode;
 }
 
-module.exports = {createNode, deleteNode, getNodeId, update};
+module.exports = {createNode, deleteNode, getNodeId, update, resetNodeIndex};

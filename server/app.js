@@ -7,8 +7,10 @@ const port = 3001;
 const index = require("./routes/index");
 
 /* Import required modules here */
-const {createNode, deleteNode, getNodeId, update} = require("./models/NodeOperations");
-const {createEdge, removeEdge} = require("./models/EdgeOperations");
+const {createNode, deleteNode, getNodeId, update, resetNodeIndex} = require("./models/NodeOperations");
+
+
+const {createEdge, removeEdge, resetEdgeIndex} = require("./models/EdgeOperations");
 
 const app = express();
 
@@ -28,36 +30,58 @@ io.on("connection", (socket) => {
 
     console.log("client connected");
 
+    function handleNodeCreation(obj) {
+        console.log(obj);
+        let o = JSON.parse(obj);
+        let newNode = createNode(o.name);
+        if (visualizerClient) visualizerClient.emit("constructNode", newNode.id, o.name);
+    }
+
+    function handleEdgeCreation(obj) {
+        console.log(obj);
+        let o = JSON.parse(obj);
+        let label = o.label, from = getNodeId(o.from), to = getNodeId(o.to);
+        console.log(`edge \"${label}\" constructed from ${o.from} to ${o.to}\n`);
+
+        let edgeId = removeEdge(from, to);
+        let newEdge = createEdge(from, to, label);
+
+        if (edgeId !== -1 && visualizerClient) {
+            visualizerClient.emit("deleteEdge", edgeId);
+            return;
+        }
+        if (visualizerClient)
+            visualizerClient.emit("constructEdge", newEdge.id, label, from, to);
+    }
+
+    function handleNodeDeletion(obj) {
+        let o = JSON.parse(obj);
+        let nodeId = deleteNode(o.name);
+        console.log(`killed ${o.name}`);
+        if (visualizerClient) visualizerClient.emit("deleteNode", nodeId);
+    }
+
     socket
         .on("setSocketId", (id) => {
             if (id === "actorHandler") {
                 console.log("actor handler is up");
                 actorHandlerClient = socket;
+                // resetNodeIndex();
+                // resetEdgeIndex();
             }
             else {
                 console.log("visualizer is up");
                 visualizerClient = socket;
             }
         })
-        .on("constructNode", (name) => {
-            let newNode = createNode(name);
-            if (visualizerClient) visualizerClient.emit("constructNode", newNode.id, name)
+        .on("constructNode", (obj) => {
+            handleNodeCreation(obj);
         })
-        .on("constructEdge", (...args) => {
-            // args[0] - message name ; args[1] - sending actor ref ; args[2] - receiving actor ref
-            let label = args[0], from = getNodeId(args[1]), to = getNodeId(args[2]);
-            console.log(`edge \"${label}\" constructed from ${args[1]} to ${args[2]}\n`);
-
-            let edgeId = removeEdge(from, to);
-            let newEdge = createEdge(from, to, label);
-
-            if (edgeId !== -1) visualizerClient.emit("deleteEdge", edgeId);
-
-            if (visualizerClient) visualizerClient.emit("constructEdge", newEdge.id, label, from, to);
+        .on("constructEdge", (obj) => {
+            handleEdgeCreation(obj);
         })
-        .on("destroyNode", (name) => {
-            let nodeId = deleteNode(name);
-            if (visualizerClient) visualizerClient.emit("deleteNode", nodeId);
+        .on("destroyNode", (obj) => {
+            handleNodeDeletion(obj);
         })
 /*
         .on("setState", (state) => {

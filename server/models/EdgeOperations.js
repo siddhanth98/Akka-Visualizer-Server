@@ -1,6 +1,14 @@
 const Edge = require("./VisEdge");
-const edges = {};
-let id = 0;
+let edges = {};
+let edgeId = 0;
+
+/**
+ * Reset edge index
+ */
+function resetEdgeIndex() {
+    edgeId = 0;
+    edges = {};
+}
 
 /**
  * Remove an edge and get its ID
@@ -33,11 +41,11 @@ function removeEdge(from, to) {
  * @return New edge reference
  */
 function createEdge(from, to, label) {
-    let newEdge = new Edge(id, from, to, label);
-    edges[id] = newEdge;
+    let newEdge = new Edge(edgeId, from, to, label);
+    edges[edgeId] = newEdge;
     // console.log(`edge \"${label}\" constructed from nodeIDs ${from} to ${to}`);
-    id += 1;
+    edgeId += 1;
     return newEdge;
 }
 
-module.exports = {createEdge, removeEdge};
+module.exports = {createEdge, removeEdge, resetEdgeIndex};
