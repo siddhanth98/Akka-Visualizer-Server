@@ -41,7 +41,7 @@ io.on("connection", (socket) => {
         console.log(obj);
         let o = JSON.parse(obj);
         let label = o.label, from = getNodeId(o.from), to = getNodeId(o.to);
-        console.log(`edge \"${label}\" constructed from ${o.from} to ${o.to}\n`);
+        console.log(`edge \"${label}\" constructed from ${o.from}(id=${from}) to ${o.to}(id=${to})\n`);
 
         let edgeId = removeEdge(from, to);
         let newEdge = createEdge(from, to, label);

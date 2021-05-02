@@ -54,8 +54,8 @@ function createNode(label, neighbors = [], state = {}) {
     let newNode = new Node(nodeId, label, neighbors, state);
     nodes[nodeId] = newNode;
     nodeNameToId[label] = nodeId;
+    console.log(`created node labelled ${label} having id ${nodeId}\n`);
     nodeId += 1;
-    console.log(`created node labelled ${label}\n`);
     return newNode;
 }
 

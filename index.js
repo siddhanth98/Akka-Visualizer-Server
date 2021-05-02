@@ -23,64 +23,64 @@ function display(node) {
     alert(stateToDisplay);
 }
 
+function startNetwork(data) {
+    let container = document.getElementById("mynetwork");
+    // options common to every node and edge in the graph
+    let options = {
+        physics: true,
+        edges: {
+            smooth: {
+                type: "continuous",
+            },
+            font: {
+                size: 10
+            }
+        }
+    };
+
+    // initialize the network!
+    let network = new vis.Network(container, data, options);
+    network.on("selectEdge", function (params) {
+        console.log(params);
+    });
+
+    /*
+    network.on("selectNode", function (params) {
+        if (network.isCluster(params.nodes[0]) === true) network.openCluster(params.nodes[0]);
+        else {
+            let clickedNodeId = params.nodes[0];
+            let clickedNode = nodeData[clickedNodeId];
+            display(clickedNode);
+        }
+    });
+    */
+    return network;
+}
+
 let socket = io("http://localhost:3001/");
 socket.emit("setSocketId", "visualizerClient");
 
-// create an array with nodes
+// initialize nodes dataset
 let nodesArray = [];
-let nodes = new vis.DataSet(nodesArray);
+let nodes = new vis.DataSet();
 
-// create an array with edges
+// initialize edges dataset
 let edgesArray = [];
+let edges = new vis.DataSet();
 
-let edges = new vis.DataSet(edgesArray);
+// Set node/edge filter values here
+let edgeFilterValues = {};
 
-// create a network
-let container = document.getElementById('mynetwork');
-
-// provide the data in the vis format
-let data = {
-    nodes: nodes,
-    edges: edges
+// Set node/edge filter functions here
+let edgeFilterFunction = (edge) => {
+    return edgeFilterValues[edge.id];
 };
 
-// options common to every node and edge in the graph
-let options = {
-    physics: true,
-    edges: {
-        smooth: {
-            type: "continuous",
-        },
-        font: {
-            size: 10
-        }
-    }
-};
-
-/*
-let index = 1;
-let edgeIndex = 0;
-let nodeData = {};
-let edgeData = {};
-*/
-
-// initialize the network!
-let network = new vis.Network(container, data, options);
-
-/*
-network.on("selectNode", function (params) {
-    if (network.isCluster(params.nodes[0]) === true) network.openCluster(params.nodes[0]);
-    else {
-        let clickedNodeId = params.nodes[0];
-        let clickedNode = nodeData[clickedNodeId];
-        display(clickedNode);
-    }
+let edgesView = new vis.DataView(edges, {
+    filter: edgeFilterFunction
 });
-*/
 
-network.on("selectEdge", function (params) {
-    console.log(params);
-});
+let network = startNetwork({nodes: nodes, edges: edgesView});
 
 document.getElementById("cluster").addEventListener("click", function() {
     clusterByColor();
@@ -114,6 +114,8 @@ socket.on("constructNode", (id, name) => { /* create a new node in the graph */
             arrows: "to",
             length: 200
         });
+        edgeFilterValues[id] = true;
+        edgesView.refresh();
     })
     .on("deleteNode", (nodeId) => {
         console.log(`deleting nodeID ${nodeId}`);
@@ -121,7 +123,10 @@ socket.on("constructNode", (id, name) => { /* create a new node in the graph */
     })
     .on("deleteEdge", (edgeId) => {
         console.log(`deleting edgeID ${edgeId}`);
-        edges.remove(edgeId);
+        if (edgeFilterValues[edgeId]) {
+            delete edgeFilterValues[edgeId];
+            edgesView.refresh();
+        }
     })
 /* (try using indexedDB to store actor state information
     .on("setState", (state) => {
