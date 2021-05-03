@@ -18,9 +18,12 @@ function resetNodeIndex() {
  * @return ID of node being updated
  */
 function update(state) {
-    let nodeId = getNodeId(state.name);
+    let nodeId = getNodeId(state.name); /* it is assumed that "name" refers to the (unique) fully qualified name of the actor */
     let node = nodes[nodeId];
-    Object.keys(state).forEach(k => node.state[k] = state[k]);
+    Object.keys(state).forEach(k => {
+        node.state[k] = state[k];
+    });
+    return node;
 }
 
 /**
@@ -46,12 +49,11 @@ function deleteNode(name) {
 /**
  * Creates a new node with a new ID and stores it
  * @param label Name of node
- * @param neighbors List of neighbors
  * @param state State of a node having all properties of an actor entity
  * @return New node reference
  */
-function createNode(label, neighbors = [], state = {}) {
-    let newNode = new Node(nodeId, label, neighbors, state);
+function createNode(label, state = {}) {
+    let newNode = new Node(nodeId, label, state);
     nodes[nodeId] = newNode;
     nodeNameToId[label] = nodeId;
     console.log(`created node labelled ${label} having id ${nodeId}\n`);

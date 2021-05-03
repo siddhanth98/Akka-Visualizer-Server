@@ -9,7 +9,6 @@ const index = require("./routes/index");
 /* Import required modules here */
 const {createNode, deleteNode, getNodeId, update, resetNodeIndex} = require("./models/NodeOperations");
 
-
 const {createEdge, removeEdge, resetEdgeIndex} = require("./models/EdgeOperations");
 
 const app = express();
@@ -56,14 +55,12 @@ io.on("connection", (socket) => {
             if (latestEventTime <= currentEventTime) {
                 /* Current event is in order */
                 /* Remove and handle stored event first and then store current event to be handled later */
-                console.log(`current event ${eventName}(t=${currentEventTime}) is in order with stored event ${ev["eventName"]}(t=${latestEventTime})`);
                 events.shift();
                 handleEvent(ev);
             }
         }
         /* Current event happened earlier than latest event stored */
         /* Forward current event to vis */
-        console.log(`current event ${eventName}(t=${currentEventTime}) is inserted in the queue now`);
         o["eventName"] = eventName;
         events.push(JSON.stringify(o));
     }
@@ -71,7 +68,7 @@ io.on("connection", (socket) => {
     function handleNodeCreation(o) {
         console.log(o);
         let newNode = createNode(o.name);
-        if (visualizerClient) visualizerClient.emit("constructNode", newNode.id, o.name);
+        if (visualizerClient) visualizerClient.emit("constructNode", newNode);
     }
 
     function handleEdgeCreation(o) {
@@ -79,13 +76,16 @@ io.on("connection", (socket) => {
         let label = o.label, from = getNodeId(o.from), to = getNodeId(o.to);
         console.log(`edge \"${label}\" constructed from ${o.from}(id=${from}) to ${o.to}(id=${to})\n`);
 
-        let edgeId = removeEdge(from, to);
+        let oldEdge = removeEdge(from, to);
         let newEdge = createEdge(from, to, label);
 
-        if (edgeId !== -1 && visualizerClient)
-            visualizerClient.emit("deleteEdge", edgeId);
-        if (visualizerClient)
-            visualizerClient.emit("constructEdge", newEdge.id, label, from, to);
+        if (visualizerClient) {
+            if (oldEdge) {
+                newEdge.weight = oldEdge["weight"]+1;
+                visualizerClient.emit("deleteEdge", oldEdge["id"]);
+            }
+            visualizerClient.emit("constructEdge", newEdge);
+        }
     }
 
     function handleNodeDeletion(o) {
@@ -101,6 +101,9 @@ io.on("connection", (socket) => {
                 actorHandlerClient = socket;
                 // resetNodeIndex();
                 // resetEdgeIndex();
+                setInterval(() => {
+                    if (events.length > 0) handleEvent(JSON.parse(events.shift()));
+                }, 10);
             }
             else {
                 console.log("visualizer is up");
@@ -116,12 +119,10 @@ io.on("connection", (socket) => {
         .on("destroyNode", (obj) => {
             assessEvent("deleteNode", obj);
         })
-/*
         .on("setState", (state) => {
-            update(state);
-            if (visualizerClient) visualizerClient.emit("setState", state);
+            let node = update(JSON.parse(state));
+            if (visualizerClient) visualizerClient.emit("setState", node);
         })
-*/
         .on("disconnect", () => {
             console.log("client disconnected");
             socket.disconnect();

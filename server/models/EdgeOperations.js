@@ -18,10 +18,11 @@ function resetEdgeIndex() {
  * @return ID of edge being removed
  */
 function removeEdge(from, to) {
-    let edgeId = -1;
+    let edgeId = -1, edge = null;
     for (let k of Object.keys(edges)) {
         if (edges[k].from === from && edges[k].to === to) {
             edgeId = k;
+            edge = edges[edgeId];
             break;
         }
     }
@@ -30,7 +31,7 @@ function removeEdge(from, to) {
         delete edges[edgeId];
     }
     else console.log(`couldn't find an edge between ${from} and ${to}\n`);
-    return edgeId;
+    return edge;
 }
 
 /**

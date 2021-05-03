@@ -1,3 +1,29 @@
+function clusterByNodeType() {
+    let clusterOptions;
+    let nodeTypes = ["control-node", "data-node"];
+    let colors = {"control-node": "blue", "data-node": "red"};
+
+    nodeTypes.forEach(t => {
+        clusterOptions = {
+            joinCondition: function(childOptions) {
+                return childOptions &&
+                    childOptions.state &&
+                    childOptions.state.nodeType === t;
+            },
+            clusterNodeProperties: {
+                id: "cluster-".concat(t),
+                shape: "diamond",
+                color: colors[t],
+                label: t.concat("s"),
+                font: {
+                    color: "white"
+                }
+            }
+        };
+        network.cluster(clusterOptions);
+    })
+}
+
 function clusterByColor() {
     let clusterOptions;
     let colors = ["red", "brown"];
@@ -10,7 +36,10 @@ function clusterByColor() {
                 id: "cluster-".concat(c),
                 shape: "database",
                 color: c,
-                label: c
+                label: c,
+                font: {
+                    color: "white"
+                }
             }
         };
         network.cluster(clusterOptions);
@@ -20,7 +49,8 @@ function clusterByColor() {
 function display(node) {
     let stateToDisplay = "";
     Object.keys(node.state).forEach(s => stateToDisplay += `${s} : ${node.state[s]}\n`);
-    alert(stateToDisplay);
+    if (stateToDisplay.length > 0)
+        alert(stateToDisplay);
 }
 
 function startNetwork(data) {
@@ -34,27 +64,37 @@ function startNetwork(data) {
             },
             font: {
                 size: 10
-            }
+            },
+            color: "white"
         }
     };
 
     // initialize the network!
     let network = new vis.Network(container, data, options);
     network.on("selectEdge", function (params) {
-        console.log(params);
+        if (edgeWeights[params.edges[0]])
+            alert(`${edgeWeights[params.edges[0]]} messages were sent along this way up till now`);
     });
 
-    /*
     network.on("selectNode", function (params) {
         if (network.isCluster(params.nodes[0]) === true) network.openCluster(params.nodes[0]);
         else {
             let clickedNodeId = params.nodes[0];
-            let clickedNode = nodeData[clickedNodeId];
+            let clickedNode = nodes.get(clickedNodeId);
             display(clickedNode);
         }
     });
-    */
     return network;
+}
+
+function displayData(nodes, node) {
+    if (nodes.get(node.id)) {
+        const container = document.createElement("div");
+        let html = JSON.stringify(nodes.get(node.id).state);
+        container.innerHTML = html;
+        return container;
+    }
+    return "";
 }
 
 let socket = io("http://localhost:3001/");
@@ -62,11 +102,11 @@ socket.emit("setSocketId", "visualizerClient");
 
 // initialize nodes dataset
 let nodesArray = [];
-let nodes = new vis.DataSet();
+let nodes = new vis.DataSet({});
 
 // initialize edges dataset
-let edgesArray = [];
-let edges = new vis.DataSet();
+let edgeWeights = {};
+let edges = new vis.DataSet({});
 
 // Set node/edge filter values here
 let edgeFilterValues = {};
@@ -82,38 +122,42 @@ let edgesView = new vis.DataView(edges, {
 
 let network = startNetwork({nodes: nodes, edges: edgesView});
 
-document.getElementById("cluster").addEventListener("click", function() {
+document.getElementById("cluster-color").addEventListener("click", function() {
     clusterByColor();
+});
+
+document.getElementById("cluster-node-type").addEventListener("click", function() {
+    clusterByNodeType();
 });
 
 document.getElementById("stop").onclick = function() {
     socket.emit("stop");
 }
 
-socket.on("constructNode", (id, name) => { /* create a new node in the graph */
-        console.log(`constructing node labelled ${name}`);
-        let newNodeColor = id % 2 === 0 ? "red" : "brown";
+socket
+    .on("constructNode", (node) => { /* create a new node in the graph */
+        console.log(`constructing node labelled ${node.label}`);
+        let newNodeColor = node.id % 2 === 0 ? "red" : "brown";
         let newNodeFontColor = "white";
         nodes.add({
-            id: id,
-            label: name,
             color: newNodeColor,
-            font: {color: newNodeFontColor}
+            font: {color: newNodeFontColor},
+            ...node
         });
     })
-    .on("constructEdge", (...args) => { /* create a new edge in the graph */
-        // args[0] - id ; args[1] - message name ; args[2] - sending actor ref ; args[3] - receiving actor ref
-        let id = args[0], label = args[1], from = args[2], to = args[3];
+    .on("constructEdge", (edge) => { /* create a new edge in the graph */
+        let id = edge.id, label = edge.label, from = edge.from, to = edge.to;
         console.log(`constructing edge \"${label}\" from ${from} to ${to}`);
 
-        edges.add({
+        edges.update({
             id: id,
             from: from,
             to: to,
             label: label,
             arrows: "to",
-            length: 200
+            length: 400
         });
+        edgeWeights[edge.id] = edge.weight;
         edgeFilterValues[id] = true;
         edgesView.refresh();
     })
@@ -128,11 +172,15 @@ socket.on("constructNode", (id, name) => { /* create a new node in the graph */
             edgesView.refresh();
         }
     })
-/* (try using indexedDB to store actor state information
-    .on("setState", (state) => {
-        let nodeId = state.name;
-        let node = nodeData[nodeId];
-        Object.keys(state).forEach(s => node.state[s] = state[s]); // state of a node gets updated here
+    .on("setState", (node) => {
+        try {
+            nodes.update({
+                id: node.id,
+                ...node
+            });
+        }
+        catch(err) {
+            console.error(err);
+        }
     })
-*/
     .on("disconnect", () => socket.disconnect());

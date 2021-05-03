@@ -1,7 +1,6 @@
-function Node(id, label, neighbors, state) {
+function Node(id, label, state) {
     this.id = id;
     this.label = label;
-    this.neighbors = neighbors;
     this.state = state;
 }
 
