@@ -15,6 +15,7 @@ const app = express();
 
 let actorHandlerClient, visualizerClient;
 let events = []; /* this will store socket events with millisecond-timestamps */
+let eventInterval;
 
 app.use(express.json());
 app.use(index);
@@ -32,15 +33,19 @@ io.on("connection", (socket) => {
 
     function handleEvent(ev) {
         switch(ev["eventName"]) {
-            case "constructNode":
+            case "spawn":
                 handleNodeCreation(ev);
                 break;
-            case "constructEdge":
+            case "receive":
                 handleEdgeCreation(ev);
                 break;
-            case "deleteNode":
+            case "destroy":
                 handleNodeDeletion(ev);
                 break;
+            case "update": {
+                handleStateUpdate(ev.state);
+                break;
+            }
         }
     }
 
@@ -48,21 +53,25 @@ io.on("connection", (socket) => {
         let o = JSON.parse(obj);
         let currentEventTime = o["time"];
 
+        o["eventName"] = eventName;
+        events.push(JSON.stringify(o));
+
         if (events.length > 0) {
             let ev = JSON.parse(events[0]);
             let latestEventTime = ev["time"];
 
-            if (latestEventTime <= currentEventTime) {
-                /* Current event is in order */
-                /* Remove and handle stored event first and then store current event to be handled later */
+            /*if (latestEventTime <= currentEventTime) {
+                /!* Current event is in order *!/
+                /!* Remove and handle stored event first and then store current event to be handled later *!/
                 events.shift();
                 handleEvent(ev);
-            }
+            }*/
+            if (latestEventTime > currentEventTime) events.push(events.shift());
         }
         /* Current event happened earlier than latest event stored */
         /* Forward current event to vis */
-        o["eventName"] = eventName;
-        events.push(JSON.stringify(o));
+        /*o["eventName"] = eventName;
+        events.push(JSON.stringify(o));*/
     }
 
     function handleNodeCreation(o) {
@@ -81,17 +90,29 @@ io.on("connection", (socket) => {
 
         if (visualizerClient) {
             if (oldEdge) {
-                newEdge.weight = oldEdge["weight"]+1;
+                newEdge.count = oldEdge["count"]+1;
+                newEdge.weight = oldEdge["weight"]+0.1;
                 visualizerClient.emit("deleteEdge", oldEdge["id"]);
             }
             visualizerClient.emit("constructEdge", newEdge);
         }
     }
 
+    function handleStateUpdate(state) {
+        let node = update(state);
+        if (visualizerClient) visualizerClient.emit("setState", node);
+    }
+
     function handleNodeDeletion(o) {
         let nodeId = deleteNode(o.name);
         console.log(`killed ${o.name}`);
         if (visualizerClient) visualizerClient.emit("deleteNode", nodeId);
+    }
+
+    function setEventInterval(time) {
+        eventInterval = setInterval(() => {
+            if (events.length > 0) handleEvent(JSON.parse(events.shift()));
+        }, time);
     }
 
     socket
@@ -101,27 +122,30 @@ io.on("connection", (socket) => {
                 actorHandlerClient = socket;
                 // resetNodeIndex();
                 // resetEdgeIndex();
-                setInterval(() => {
-                    if (events.length > 0) handleEvent(JSON.parse(events.shift()));
-                }, 10);
+                setEventInterval(1000);
             }
             else {
                 console.log("visualizer is up");
                 visualizerClient = socket;
             }
         })
-        .on("constructNode", (obj) => {
-            assessEvent("constructNode", obj);
+        .on("spawn", (obj) => {
+            assessEvent("spawn", obj);
         })
-        .on("constructEdge", (obj) => {
-            assessEvent("constructEdge", obj);
+        .on("receive", (obj) => {
+            assessEvent("receive", obj);
         })
         .on("destroyNode", (obj) => {
-            assessEvent("deleteNode", obj);
+            assessEvent("destroy", obj);
         })
-        .on("setState", (state) => {
-            let node = update(JSON.parse(state));
-            if (visualizerClient) visualizerClient.emit("setState", node);
+        .on("setState", (obj) => {
+            assessEvent("update", obj);
+        })
+        .on("pause", () => {
+            clearInterval(eventInterval);
+        })
+        .on("resume", (n, t) => {
+            setEventInterval(t / n)
         })
         .on("disconnect", () => {
             console.log("client disconnected");

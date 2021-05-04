@@ -20,7 +20,12 @@ function clusterByNodeType() {
                 }
             }
         };
-        network.cluster(clusterOptions);
+        try {
+            network.cluster(clusterOptions);
+        }
+        catch(err) {
+            console.error(err);
+        }
     })
 }
 
@@ -44,6 +49,42 @@ function clusterByColor() {
         };
         network.cluster(clusterOptions);
     })
+}
+
+function clogEdges(edgeWeights, edgeCounts) {
+    console.log(edges);
+    edges.getIds().forEach(id => {
+        console.log(`clogging edge ${id}`);
+        edges.update({
+            id: id,
+            value: edgeWeights[id],
+            font: {
+                size: 10
+            }
+        });
+    });
+    console.log(edges);
+}
+
+function unclogEdges() {
+    console.log(edges);
+    edges.getIds().forEach(id => {
+        let edge = edges.get(id);
+        console.log(`unclogging edge ${edge.id}`);
+        edges.remove(edge.id);
+        edges.update({
+            id: edge.id,
+            from: edge.from,
+            to: edge.to,
+            label: edge.label,
+            arrows: "to",
+            length: edge.length,
+            font: {
+                size: 10
+            }
+        });
+    });
+    console.log(edges);
 }
 
 function display(node) {
@@ -72,8 +113,8 @@ function startNetwork(data) {
     // initialize the network!
     let network = new vis.Network(container, data, options);
     network.on("selectEdge", function (params) {
-        if (edgeWeights[params.edges[0]])
-            alert(`${edgeWeights[params.edges[0]]} messages were sent along this way up till now`);
+        if (edgeCounts[params.edges[0]])
+            alert(`${edgeCounts[params.edges[0]]} messages were sent along this way up till now`);
     });
 
     network.on("selectNode", function (params) {
@@ -105,6 +146,7 @@ let nodesArray = [];
 let nodes = new vis.DataSet({});
 
 // initialize edges dataset
+let edgeCounts = {};
 let edgeWeights = {};
 let edges = new vis.DataSet({});
 
@@ -130,10 +172,24 @@ document.getElementById("cluster-node-type").addEventListener("click", function(
     clusterByNodeType();
 });
 
-document.getElementById("stop").onclick = function() {
-    socket.emit("stop");
+document.getElementById("clog-edges").addEventListener("click", function() {
+    clogEdges(edgeWeights, edgeCounts);
+});
+
+document.getElementById("unclog-edges").addEventListener("click", function() {
+    unclogEdges();
+});
+
+document.getElementById("pause").onclick = function() {
+    socket.emit("pause");
 }
 
+document.getElementById("resume").onclick = function() {
+    let numEvents = document.getElementById("numEvents").value;
+    let duration = document.getElementById("duration").value;
+    if (numEvents && duration)
+        socket.emit("resume", parseInt(numEvents), parseInt(duration));
+}
 socket
     .on("constructNode", (node) => { /* create a new node in the graph */
         console.log(`constructing node labelled ${node.label}`);
@@ -157,6 +213,7 @@ socket
             arrows: "to",
             length: 400
         });
+        edgeCounts[edge.id] = edge.count;
         edgeWeights[edge.id] = edge.weight;
         edgeFilterValues[id] = true;
         edgesView.refresh();
