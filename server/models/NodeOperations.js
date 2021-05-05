@@ -20,9 +20,13 @@ function resetNodeIndex() {
 function update(state) {
     let nodeId = getNodeId(state.name); /* it is assumed that "name" refers to the (unique) fully qualified name of the actor */
     let node = nodes[nodeId];
-    Object.keys(state).forEach(k => {
-        node.state[k] = state[k];
-    });
+    if (node) {
+        Object.keys(state).forEach(k => {
+            node.state[k] = state[k];
+        });
+    }
+    console.log("just updated state of node:");
+    console.log(node);
     return node;
 }
 

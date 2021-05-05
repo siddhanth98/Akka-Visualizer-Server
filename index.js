@@ -1,37 +1,37 @@
-function clusterByNodeType() {
-    let clusterOptions;
-    let nodeTypes = ["control-node", "data-node"];
-    let colors = {"control-node": "blue", "data-node": "red"};
+function clusterByNodeType(nodeTypes, colors) {
+    try {
+        let clusterOptions;
 
-    nodeTypes.forEach(t => {
-        clusterOptions = {
-            joinCondition: function(childOptions) {
-                return childOptions &&
-                    childOptions.state &&
-                    childOptions.state.nodeType === t;
-            },
-            clusterNodeProperties: {
-                id: "cluster-".concat(t),
-                shape: "diamond",
-                color: colors[t],
-                label: t.concat("s"),
-                font: {
-                    color: "white"
+        nodeTypes.forEach(t => {
+            clusterOptions = {
+                joinCondition: function (childOptions) {
+                    return childOptions &&
+                        childOptions.state &&
+                        childOptions.state.nodeType === t;
+                },
+                clusterNodeProperties: {
+                    id: "cluster-".concat(t),
+                    shape: "diamond",
+                    color: colors[t],
+                    label: t.concat,
+                    font: {
+                        color: "white"
+                    }
                 }
-            }
-        };
-        try {
+            };
             network.cluster(clusterOptions);
-        }
-        catch(err) {
-            console.error(err);
-        }
-    })
+        })
+    }
+    catch(err) {
+        console.error(err);
+    }
 }
 
-function clusterByColor() {
+function clusterByColor(groups) {
     let clusterOptions;
-    let colors = ["red", "brown"];
+    let colors = [];
+    Object.keys(groups).forEach(k => colors.push(groups[k]));
+
     colors.forEach(c => {
         clusterOptions = {
             joinCondition: function (childOptions) {
@@ -143,11 +143,15 @@ socket.emit("setSocketId", "visualizerClient");
 
 // initialize nodes dataset
 let nodesArray = [];
+let groupNames = [];
+let groupColors = {};
+
 let nodes = new vis.DataSet({});
 
 // initialize edges dataset
 let edgeCounts = {};
 let edgeWeights = {};
+let clogged = false;
 let edges = new vis.DataSet({});
 
 // Set node/edge filter values here
@@ -165,19 +169,32 @@ let edgesView = new vis.DataView(edges, {
 let network = startNetwork({nodes: nodes, edges: edgesView});
 
 document.getElementById("cluster-color").addEventListener("click", function() {
-    clusterByColor();
+    clusterByColor(groupColors);
 });
 
 document.getElementById("cluster-node-type").addEventListener("click", function() {
-    clusterByNodeType();
+    clusterByNodeType(groupNames, groupColors);
 });
 
 document.getElementById("clog-edges").addEventListener("click", function() {
+    clogged = true;
     clogEdges(edgeWeights, edgeCounts);
 });
 
 document.getElementById("unclog-edges").addEventListener("click", function() {
+    clogged = false;
     unclogEdges();
+});
+
+document.getElementById("add-group").addEventListener("click", function() {
+    let name = document.getElementById("group-name").value;
+    let color = document.getElementById("group-color").value;
+    if (name && color) {
+        groupNames.push(name);
+        groupColors[name] = color;
+        document.getElementById("group-name").value = "";
+        document.getElementById("group-color").value = "";
+    }
 });
 
 document.getElementById("pause").onclick = function() {
@@ -192,7 +209,7 @@ document.getElementById("resume").onclick = function() {
 }
 socket
     .on("constructNode", (node) => { /* create a new node in the graph */
-        console.log(`constructing node labelled ${node.label}`);
+        console.log(`constructing node labelled ${node.label} (id=${node.id})`);
         let newNodeColor = node.id % 2 === 0 ? "red" : "brown";
         let newNodeFontColor = "white";
         nodes.add({
@@ -213,9 +230,11 @@ socket
             arrows: "to",
             length: 400
         });
+
         edgeCounts[edge.id] = edge.count;
         edgeWeights[edge.id] = edge.weight;
         edgeFilterValues[id] = true;
+        if (clogged) edges.update({id: id, value: edgeWeights[id]});
         edgesView.refresh();
     })
     .on("deleteNode", (nodeId) => {

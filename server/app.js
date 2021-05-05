@@ -49,29 +49,22 @@ io.on("connection", (socket) => {
         }
     }
 
+    function getEventPosition(time, eventsQueue) {
+        let index = 0;
+        for (let i = 0; i < eventsQueue.length; i += 1) {
+            if (JSON.parse(eventsQueue[i])["time"] > time)
+                break;
+            index += 1;
+        }
+        return index;
+    }
+
     function assessEvent(eventName, obj) {
         let o = JSON.parse(obj);
         let currentEventTime = o["time"];
-
         o["eventName"] = eventName;
-        events.push(JSON.stringify(o));
-
-        if (events.length > 0) {
-            let ev = JSON.parse(events[0]);
-            let latestEventTime = ev["time"];
-
-            /*if (latestEventTime <= currentEventTime) {
-                /!* Current event is in order *!/
-                /!* Remove and handle stored event first and then store current event to be handled later *!/
-                events.shift();
-                handleEvent(ev);
-            }*/
-            if (latestEventTime > currentEventTime) events.push(events.shift());
-        }
-        /* Current event happened earlier than latest event stored */
-        /* Forward current event to vis */
-        /*o["eventName"] = eventName;
-        events.push(JSON.stringify(o));*/
+        let newIndex = getEventPosition(currentEventTime, events);
+        events = events.slice(0, newIndex).concat(JSON.stringify(o)).concat(events.slice(newIndex, events.length));
     }
 
     function handleNodeCreation(o) {
@@ -110,8 +103,12 @@ io.on("connection", (socket) => {
     }
 
     function setEventInterval(time) {
+        console.log(`setting interval of ${time} ms`);
         eventInterval = setInterval(() => {
-            if (events.length > 0) handleEvent(JSON.parse(events.shift()));
+            if (events.length > 0) {
+                console.log("handling event now");
+                handleEvent(JSON.parse(events.shift()));
+            }
         }, time);
     }
 
@@ -145,7 +142,7 @@ io.on("connection", (socket) => {
             clearInterval(eventInterval);
         })
         .on("resume", (n, t) => {
-            setEventInterval(t / n)
+            setEventInterval(1000*t / n)
         })
         .on("disconnect", () => {
             console.log("client disconnected");
