@@ -49,6 +49,12 @@ io.on("connection", (socket) => {
         }
     }
 
+    /**
+     * Gets the correct position of the new event to be placed
+     * in the priority queue
+     * @param time Current event timestamp
+     * @param eventsQueue Priority queue of events
+     */
     function getEventPosition(time, eventsQueue) {
         let index = 0;
         for (let i = 0; i < eventsQueue.length; i += 1) {
